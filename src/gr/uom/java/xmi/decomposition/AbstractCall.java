@@ -77,7 +77,7 @@ public abstract class AbstractCall implements LocationInfoProvider {
 			String expression1AfterReplacements = new String(expression1);
 			for(Replacement replacement : replacements) {
 				if(replacement.getType().equals(ReplacementType.TYPE)) {
-					expression1AfterReplacements = ReplacementUtil.performReplacement(expression1AfterReplacements, replacement.getBefore(), replacement.getAfter());
+					expression1AfterReplacements = ReplacementUtil.performReplacement(expression1AfterReplacements, expression2, replacement.getBefore(), replacement.getAfter());
 				}
 			}
 			if(expression1AfterReplacements.equals(expression2)) {
@@ -131,6 +131,25 @@ public abstract class AbstractCall implements LocationInfoProvider {
 		return true;
 	}
 
+	public boolean allArgumentsReplaced(AbstractCall call, Set<Replacement> replacements) {
+		int replacedArguments = 0;
+		List<String> arguments1 = getArguments();
+		List<String> arguments2 = call.getArguments();
+		if(arguments1.size() == arguments2.size()) {
+			for(int i=0; i<arguments1.size(); i++) {
+				String argument1 = arguments1.get(i);
+				String argument2 = arguments2.get(i);
+				for(Replacement replacement : replacements) {
+					if(replacement.getBefore().equals(argument1) &&	replacement.getAfter().equals(argument2)) {
+						replacedArguments++;
+						break;
+					}
+				}
+			}
+		}
+		return replacedArguments > 0 && replacedArguments == arguments1.size();
+	}
+
 	public boolean allArgumentsReplaced(AbstractCall call, Set<Replacement> replacements, Map<String, String> parameterToArgumentMap) {
 		int replacedArguments = 0;
 		List<String> arguments1 = getArguments();
@@ -151,11 +170,13 @@ public abstract class AbstractCall implements LocationInfoProvider {
 		return replacedArguments > 0 && replacedArguments == arguments1.size();
 	}
 
-	public boolean renamedWithIdenticalExpressionAndArguments(AbstractCall call, Set<Replacement> replacements) {
+	public boolean renamedWithIdenticalExpressionAndArguments(AbstractCall call, Set<Replacement> replacements, double distance) {
+		boolean identicalOrReplacedArguments = identicalOrReplacedArguments(call, replacements);
+		boolean allArgumentsReplaced = allArgumentsReplaced(call, replacements);
 		return getExpression() != null && call.getExpression() != null &&
 				identicalExpression(call, replacements) &&
 				!identicalName(call) &&
-				equalArguments(call);
+				(equalArguments(call) || (allArgumentsReplaced && normalizedNameDistance(call) <= distance) || (identicalOrReplacedArguments && !allArgumentsReplaced));
 	}
 
 	public boolean renamedWithIdenticalArgumentsAndNoExpression(AbstractCall call, double distance) {
@@ -294,6 +315,18 @@ public abstract class AbstractCall implements LocationInfoProvider {
 		}
 		else if(argumentIsEqual(statement)) {
 			return new Replacement(getArguments().get(0), statement.substring(0, statement.length()-2),
+					ReplacementType.ARGUMENT_REPLACED_WITH_STATEMENT);
+		}
+		return null;
+	}
+
+	public Replacement makeReplacementForWrappedCall(String statement) {
+		if(argumentIsReturned(statement)) {
+			return new Replacement(statement.substring(7, statement.length()-2), getArguments().get(0),
+					ReplacementType.ARGUMENT_REPLACED_WITH_RETURN_EXPRESSION);
+		}
+		else if(argumentIsEqual(statement)) {
+			return new Replacement(statement.substring(0, statement.length()-2), getArguments().get(0),
 					ReplacementType.ARGUMENT_REPLACED_WITH_STATEMENT);
 		}
 		return null;

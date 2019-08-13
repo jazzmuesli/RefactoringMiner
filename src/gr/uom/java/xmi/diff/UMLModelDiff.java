@@ -10,6 +10,7 @@ import gr.uom.java.xmi.UMLParameter;
 import gr.uom.java.xmi.UMLRealization;
 import gr.uom.java.xmi.UMLType;
 import gr.uom.java.xmi.decomposition.AbstractCodeMapping;
+import gr.uom.java.xmi.decomposition.CompositeStatementObject;
 import gr.uom.java.xmi.decomposition.OperationInvocation;
 import gr.uom.java.xmi.decomposition.StatementObject;
 import gr.uom.java.xmi.decomposition.UMLOperationBodyMapper;
@@ -181,52 +182,54 @@ public class UMLModelDiff {
       return null;
    }
 
-   private UMLClassBaseDiff getUMLClassDiffWithExistingAttributeAfter(Replacement pattern) {
-      for(UMLClassDiff classDiff : commonClassDiffList) {
-         if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
-        		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-            return classDiff;
-      }
-      for(UMLClassMoveDiff classDiff : classMoveDiffList) {
-         if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
-        		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-            return classDiff;
-      }
-      for(UMLClassMoveDiff classDiff : innerClassMoveDiffList) {
-         if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
-        		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-            return classDiff;
-      }
-      for(UMLClassRenameDiff classDiff : classRenameDiffList) {
-         if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
-        		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-            return classDiff;
-      }
-      return null;
+   private List<UMLClassBaseDiff> getUMLClassDiffWithExistingAttributeAfter(Replacement pattern) {
+	   List<UMLClassBaseDiff> classDiffs = new ArrayList<UMLClassBaseDiff>();
+	   for(UMLClassDiff classDiff : commonClassDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   for(UMLClassMoveDiff classDiff : classMoveDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   for(UMLClassMoveDiff classDiff : innerClassMoveDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   for(UMLClassRenameDiff classDiff : classRenameDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) != null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   return classDiffs;
    }
 
-   private UMLClassBaseDiff getUMLClassDiffWithNewAttributeAfter(Replacement pattern) {
-      for(UMLClassDiff classDiff : commonClassDiffList) {
-          if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
-         		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-             return classDiff;
-       }
-       for(UMLClassMoveDiff classDiff : classMoveDiffList) {
-          if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
-         		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-             return classDiff;
-       }
-       for(UMLClassMoveDiff classDiff : innerClassMoveDiffList) {
-          if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
-         		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-             return classDiff;
-       }
-       for(UMLClassRenameDiff classDiff : classRenameDiffList) {
-          if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
-         		 classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
-             return classDiff;
-       }
-       return null;
+   private List<UMLClassBaseDiff> getUMLClassDiffWithNewAttributeAfter(Replacement pattern) {
+	   List<UMLClassBaseDiff> classDiffs = new ArrayList<UMLClassBaseDiff>();
+	   for(UMLClassDiff classDiff : commonClassDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   for(UMLClassMoveDiff classDiff : classMoveDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   for(UMLClassMoveDiff classDiff : innerClassMoveDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   for(UMLClassRenameDiff classDiff : classRenameDiffList) {
+		   if(classDiff.findAttributeInOriginalClass(pattern.getAfter()) == null &&
+				   classDiff.findAttributeInNextClass(pattern.getAfter()) != null)
+			   classDiffs.add(classDiff);
+	   }
+	   return classDiffs;
    }
 
    public boolean isSubclassOf(String subclass, String finalSuperclass) {
@@ -1012,10 +1015,8 @@ public class UMLModelDiff {
 			   if(!operation.isAbstract() && !operation.hasEmptyBody() &&
 					   newInvocation.matchesOperation(operation, addedOperation.variableTypeMap(), this)) {
 				   ExtractOperationDetection detection = new ExtractOperationDetection(addedClass.getOperations(), this);
-				   ExtractOperationRefactoring refactoring = detection.check(movedMethodMapper, operation);
-				   if(refactoring != null) {
-					  this.refactorings.add(refactoring);
-				   }
+				   List<ExtractOperationRefactoring> refs = detection.check(movedMethodMapper, operation);
+				   this.refactorings.addAll(refs);
 			   }
 		   }
 	   }
@@ -1227,7 +1228,7 @@ public class UMLModelDiff {
 								 diff.getOriginalClassName(), diff.getNextClassName(), set);
 						 if(!refactorings.contains(ref)) {
 							 refactorings.add(ref);
-							 if(!a1.getVariableDeclaration().getType().equals(a2.getVariableDeclaration().getType())) {
+							 if(!a1.getVariableDeclaration().getType().equals(a2.getVariableDeclaration().getType()) || !a1.getVariableDeclaration().getType().equalsQualified(a2.getVariableDeclaration().getType())) {
 									ChangeAttributeTypeRefactoring refactoring = new ChangeAttributeTypeRefactoring(a1.getVariableDeclaration(), a2.getVariableDeclaration(),
 											diff.getOriginalClassName(), diff.getNextClassName(),
 											VariableReferenceExtractor.findReferences(a1.getVariableDeclaration(), a2.getVariableDeclaration(), diff.getOperationBodyMapperList()));
@@ -1239,12 +1240,21 @@ public class UMLModelDiff {
 				 }
 			 }
 			 else if(candidate.getOriginalVariableDeclaration() != null) {
-				 UMLClassBaseDiff diff1 = getUMLClassDiffWithExistingAttributeAfter(pattern);
-				 UMLClassBaseDiff diff2 = getUMLClassDiffWithNewAttributeAfter(pattern);
-				 if(diff1 != null) {
+				 List<UMLClassBaseDiff> diffs1 = getUMLClassDiffWithExistingAttributeAfter(pattern);
+				 List<UMLClassBaseDiff> diffs2 = getUMLClassDiffWithNewAttributeAfter(pattern);
+				 if(!diffs1.isEmpty()) {
+					 UMLClassBaseDiff diff1 = diffs1.get(0);
+					 UMLClassBaseDiff originalClassDiff = getUMLClassDiff(candidate.getOriginalAttribute().getClassName());
+					 if(diffs1.size() > 1) {
+						 for(UMLClassBaseDiff classDiff : diffs1) {
+							 if(isSubclassOf(originalClassDiff.nextClass.getName(), classDiff.nextClass.getName())) {
+								 diff1 = classDiff;
+								 break;
+							 }
+						 }
+					 }
 					 UMLAttribute a2 = diff1.findAttributeInNextClass(pattern.getAfter());
 					 if(candidate.getOriginalVariableDeclaration().isAttribute()) {
-						 UMLClassBaseDiff originalClassDiff = getUMLClassDiff(candidate.getOriginalAttribute().getClassName());
 						 if(originalClassDiff != null && originalClassDiff.removedAttributes.contains(candidate.getOriginalAttribute())) {
 							 ReplaceAttributeRefactoring ref = new ReplaceAttributeRefactoring(candidate.getOriginalAttribute(), a2, set);
 							 if(!refactorings.contains(ref)) {
@@ -1254,10 +1264,19 @@ public class UMLModelDiff {
 						 }
 					 }
 				 }
-				 else if(diff2 != null) {
+				 else if(!diffs2.isEmpty()) {
+					 UMLClassBaseDiff diff2 = diffs2.get(0);
+					 UMLClassBaseDiff originalClassDiff = getUMLClassDiff(candidate.getOriginalAttribute().getClassName());
+					 if(diffs2.size() > 1) {
+						 for(UMLClassBaseDiff classDiff : diffs2) {
+							 if(isSubclassOf(originalClassDiff.nextClass.getName(), classDiff.nextClass.getName())) {
+								 diff2 = classDiff;
+								 break;
+							 }
+						 }
+					 }
 					 UMLAttribute a2 = diff2.findAttributeInNextClass(pattern.getAfter());
 					 if(candidate.getOriginalVariableDeclaration().isAttribute()) {
-						 UMLClassBaseDiff originalClassDiff = getUMLClassDiff(candidate.getOriginalAttribute().getClassName());
 						 if(originalClassDiff != null && originalClassDiff.removedAttributes.contains(candidate.getOriginalAttribute())) {
 							 MoveAndRenameAttributeRefactoring ref = new MoveAndRenameAttributeRefactoring(candidate.getOriginalAttribute(), a2, set);
 							 if(!refactorings.contains(ref)) {
@@ -1629,9 +1648,9 @@ public class UMLModelDiff {
 	   int nonMappedElementsT2 = operationBodyMapper.nonMappedElementsT2();
 	   List<AbstractCodeMapping> exactMatchList = operationBodyMapper.getExactMatches();
 	   int exactMatches = exactMatchList.size();
-	   return mappings > 0 && (mappings > nonMappedElementsT2 ||
+	   return mappings > 0 && (mappings > nonMappedElementsT2 || (mappings > 1 && mappings >= nonMappedElementsT2) ||
 			   (exactMatches == mappings && nonMappedElementsT1 == 0) ||
-			   (exactMatches == 1 && !exactMatchList.get(0).getFragment1().throwsNewException() && nonMappedElementsT2-exactMatches < 10) ||
+			   (exactMatches == 1 && !exactMatchList.get(0).getFragment1().throwsNewException() && nonMappedElementsT2-exactMatches <= 10) ||
 			   (exactMatches > 1 && nonMappedElementsT2-exactMatches < 20) ||
 			   (mappings == 1 && mappings > operationBodyMapper.nonMappedLeafElementsT2()));
    }
@@ -1937,9 +1956,24 @@ public class UMLModelDiff {
 				}
 			}
 		}
-		return (mappings > nonMappedElementsT1-nonMappedStatementsDeclaringSameVariable &&
-				mappings > nonMappedElementsT2-nonMappedStatementsDeclaringSameVariable) ||
-				(nonMappedElementsT1 == 0 && mappings > Math.floor(nonMappedElementsT2/2.0));
+		int nonMappedLoopsIteratingOverSameVariable = 0;
+		for(CompositeStatementObject c1 : operationBodyMapper.getNonMappedInnerNodesT1()) {
+			if(c1.isLoop()) {
+				for(CompositeStatementObject c2 : operationBodyMapper.getNonMappedInnerNodesT2()) {
+					if(c2.isLoop()) {
+						Set<String> intersection = new LinkedHashSet<String>(c1.getVariables());
+						intersection.retainAll(c2.getVariables());
+						if(!intersection.isEmpty()) {
+							nonMappedLoopsIteratingOverSameVariable++;
+						}
+					}
+				}
+			}
+		}
+		return (mappings > nonMappedElementsT1-nonMappedStatementsDeclaringSameVariable-nonMappedLoopsIteratingOverSameVariable &&
+				mappings > nonMappedElementsT2-nonMappedStatementsDeclaringSameVariable-nonMappedLoopsIteratingOverSameVariable) ||
+				(nonMappedElementsT1-nonMappedStatementsDeclaringSameVariable-nonMappedLoopsIteratingOverSameVariable == 0 && mappings > Math.floor(nonMappedElementsT2/2.0)) ||
+				(nonMappedElementsT2-nonMappedStatementsDeclaringSameVariable-nonMappedLoopsIteratingOverSameVariable == 0 && mappings > Math.floor(nonMappedElementsT1/2.0));
    }
 
    private boolean movedMethodSignature(UMLOperation removedOperation, UMLOperation addedOperation) {
@@ -1952,22 +1986,28 @@ public class UMLModelDiff {
 		   else {
 			   // ignore parameters of types sourceClass and targetClass
 			   List<UMLParameter> oldParameters = new ArrayList<UMLParameter>();
+			   Set<String> oldParameterNames = new LinkedHashSet<String>();
 			   for (UMLParameter oldParameter : removedOperation.getParameters()) {
 				   if (!oldParameter.getKind().equals("return")
 						   && !looksLikeSameType(oldParameter.getType().getClassType(), addedOperation.getClassName())
 						   && !looksLikeSameType(oldParameter.getType().getClassType(), removedOperation.getClassName())) {
 					   oldParameters.add(oldParameter);
+					   oldParameterNames.add(oldParameter.getName());
 				   }
 			   }
 			   List<UMLParameter> newParameters = new ArrayList<UMLParameter>();
+			   Set<String> newParameterNames = new LinkedHashSet<String>();
 			   for (UMLParameter newParameter : addedOperation.getParameters()) {
 				   if (!newParameter.getKind().equals("return") &&
 						   !looksLikeSameType(newParameter.getType().getClassType(), addedOperation.getClassName()) &&
 						   !looksLikeSameType(newParameter.getType().getClassType(), removedOperation.getClassName())) {
 					   newParameters.add(newParameter);
+					   newParameterNames.add(newParameter.getName());
 				   }
 			   }
-			   return oldParameters.equals(newParameters) || oldParameters.containsAll(newParameters) || newParameters.containsAll(oldParameters);
+			   Set<String> intersection = new LinkedHashSet<String>(oldParameterNames);
+			   intersection.retainAll(newParameterNames);
+			   return oldParameters.equals(newParameters) || oldParameters.containsAll(newParameters) || newParameters.containsAll(oldParameters) || intersection.size() > 0;
 		   }
 	   }
 	   return false;

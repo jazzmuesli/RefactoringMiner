@@ -56,7 +56,7 @@ You can also work with the project with Eclipse IDE. First, run `./gradlew eclip
 
 # How to use RefactoringMiner as a maven dependency
 
-In order to use RefactoringMiner as a maven dependency in your project, run `./gradlew install` and add the following dependency to your project:
+In order to use RefactoringMiner as a maven dependency in your project, run `./gradlew install` to add `RefactoringMiner.jar` into your local mvn repository, and then add the following dependency to your project:
 
     <dependency>
       <groupId>org.refactoringminer</groupId>
@@ -104,6 +104,9 @@ RefactoringMiner has been used in the following studies:
 12. Sarah Fakhoury, Devjeet Roy, Sk. Adnan Hassan, and Venera Arnaoudova, "[Improving Source Code Readability: Theory and Practice](https://dl.acm.org/citation.cfm?id=3339080)," *27th IEEE/ACM International Conference on Program Comprehension* (ICPC 2019), Montreal, QC, Canada, May 25-26, 2019.
 13. Carmine Vassallo, Giovanni Grano, Fabio Palomba, Harald C. Gall, and Alberto Bacchelli, "[A large-scale empirical exploration on refactoring activities in open source software projects](https://doi.org/10.1016/j.scico.2019.05.002)," *Science of Computer Programming*, 2019.
 14. Eman Abdullah AlOmar, Mohamed Wiem Mkaouer, and Ali Ouni, "[Can refactoring be self-affirmed?: An exploratory study on how developers document their refactoring activities in commit messages](https://dl.acm.org/citation.cfm?id=3340647)," *3rd International Workshop on Refactoring* (IWOR 2019), Montreal, QC, Canada, May 28, 2019.
+15. Ana Carla Bibiano, Eduardo Fernandes, Daniel Oliveira, Alessandro Garcia, Marcos Kalinowski, Baldoino Fonseca, Roberto Oliveira, Anderson Oliveira, and Diego Cedrim, "A Quantitative Study on Characteristics and Effect of Batch Refactoring on Code Smells," *13th ACM/IEEE International Symposium on Empirical Software Engineering and Measurement* (ESEM 2019), Porto de Galinhas, Brazil, September 16-20, 2019.
+16. Eman Abdullah AlOmar, Mohamed Wiem Mkaouer, Ali Ouni, and Marouane Kessentini, "Do Design Metrics Capture Developers Perception of Quality? An Empirical Study on Self-Affirmed Refactoring Activities," *13th ACM/IEEE International Symposium on Empirical Software Engineering and Measurement* (ESEM 2019), Porto de Galinhas, Brazil, September 16-20, 2019.
+17. Valentina Lenarduzzi, Nyyti Saarimäki, and Davide Taibi, "The Technical Debt Dataset," *15th International Conference on Predictive Models and Data Analytics in Software Engineering* (PROMISE 2019), Porto de Galinhas, Brazil, September 18, 2019. 
 
 
 # Contributors
@@ -176,8 +179,7 @@ It is possible to analyze a specifc commit using `detectAtCommit` instead of `de
 is identified by its SHA key, such as in the example below:
 
 ```java
-miner.detectAtCommit(repo, "https://github.com/danilofes/refactoring-toy-example.git",
-    "05c1e773878bbacae64112f70964f4f2f7944398", new RefactoringHandler() {
+miner.detectAtCommit(repo, "05c1e773878bbacae64112f70964f4f2f7944398", new RefactoringHandler() {
   @Override
   public void handle(String commitId, List<Refactoring> refactorings) {
     System.out.println("Refactorings at " + commitId);
@@ -264,6 +266,7 @@ int endLine
 int startColumn
 int endColumn
 ```
+Alternatively, you can use the methods `List<CodeRange> leftSide()` and `List<CodeRange> rightSide()` to get a list of `CodeRange` objects for the left side (i.e., **parent** commit) and right side (i.e., **child** commit) of the refactoring, respectively.
 
 # Statement matching information for the detected refactorings
 All method-related refactoring (Extract/Inline/Move/Rename/ExtractAndMove Operation) objects come with a `UMLOperationBodyMapper` object, which can be obtained by calling method `getBodyMapper()` on the refactoring object.

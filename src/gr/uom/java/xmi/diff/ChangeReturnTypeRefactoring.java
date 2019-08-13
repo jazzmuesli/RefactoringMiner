@@ -2,25 +2,29 @@ package gr.uom.java.xmi.diff;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.refactoringminer.api.Refactoring;
 import org.refactoringminer.api.RefactoringType;
 
 import gr.uom.java.xmi.UMLOperation;
 import gr.uom.java.xmi.UMLType;
+import gr.uom.java.xmi.decomposition.AbstractCodeMapping;
 
 public class ChangeReturnTypeRefactoring implements Refactoring {
 	private UMLType originalType;
 	private UMLType changedType;
 	private UMLOperation operationBefore;
 	private UMLOperation operationAfter;
+	private Set<AbstractCodeMapping> returnReferences;
 
 	public ChangeReturnTypeRefactoring(UMLType originalType, UMLType changedType,
-			UMLOperation operationBefore, UMLOperation operationAfter) {
+			UMLOperation operationBefore, UMLOperation operationAfter, Set<AbstractCodeMapping> returnReferences) {
 		this.originalType = originalType;
 		this.changedType = changedType;
 		this.operationBefore = operationBefore;
 		this.operationAfter = operationAfter;
+		this.returnReferences = returnReferences;
 	}
 
 	public RefactoringType getRefactoringType() {
@@ -47,14 +51,19 @@ public class ChangeReturnTypeRefactoring implements Refactoring {
 		return operationAfter;
 	}
 
+	public Set<AbstractCodeMapping> getReturnReferences() {
+		return returnReferences;
+	}
+
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
+		boolean qualified = originalType.equals(changedType) && !originalType.equalsQualified(changedType);
 		sb.append(getName()).append("\t");
-		sb.append(originalType);
+		sb.append(qualified ? originalType.toQualifiedString() : originalType.toString());
 		sb.append(" to ");
-		sb.append(changedType);
+		sb.append(qualified ? changedType.toQualifiedString() : changedType.toString());
 		sb.append(" in method ");
-		sb.append(operationAfter);
+		sb.append(qualified ? operationAfter.toQualifiedString() : operationAfter.toString());
 		sb.append(" in class ").append(operationAfter.getClassName());
 		return sb.toString();
 	}

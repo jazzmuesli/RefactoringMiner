@@ -213,6 +213,17 @@ public class UMLOperation implements Comparable<UMLOperation>, Serializable, Loc
 			return false;
 	}
 
+	public boolean equalQualifiedReturnParameter(UMLOperation operation) {
+		UMLParameter thisReturnParameter = this.getReturnParameter();
+		UMLParameter otherReturnParameter = operation.getReturnParameter();
+		if(thisReturnParameter != null && otherReturnParameter != null)
+			return thisReturnParameter.equalsQualified(otherReturnParameter);
+		else if(thisReturnParameter == null && otherReturnParameter == null)
+			return true;
+		else
+			return false;
+	}
+
 	public boolean equalSignature(UMLOperation operation) {
 		boolean equalParameterTypes = this.getParameterTypeList().equals(operation.getParameterTypeList());
 		boolean compatibleParameterTypes = false;
@@ -277,7 +288,7 @@ public class UMLOperation implements Comparable<UMLOperation>, Serializable, Loc
 
 	private static boolean equivalentNames(UMLOperation operation1, UMLOperation operation2) {
 		boolean equalReturn = operation1.equalReturnParameter(operation2) && operation1.getParametersWithoutReturnType().size() > 0 && operation2.getParametersWithoutReturnType().size() > 0;
-		if(operation1.name.startsWith(operation2.name) && !operation2.name.equals("get") && !operation2.name.equals("set")) {
+		if(operation1.name.startsWith(operation2.name) && !operation2.name.equals("get") && !operation2.name.equals("set") && !operation2.name.equals("print")) {
 			String suffix1 = operation1.name.substring(operation2.name.length(), operation1.name.length());
 			String className2 = operation2.className.contains(".") ? operation2.className.substring(operation2.className.lastIndexOf(".")+1, operation2.className.length()) : operation2.className;
 			return operation2.name.length() > operation1.name.length() - operation2.name.length() || equalReturn || className2.contains(suffix1);
@@ -487,6 +498,35 @@ public class UMLOperation implements Comparable<UMLOperation>, Serializable, Loc
 		if(returnParameter != null) {
 			sb.append(" : ");
 			sb.append(returnParameter.toString());
+		}
+		return sb.toString();
+	}
+
+	public String toQualifiedString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(visibility);
+		sb.append(" ");
+		if(isAbstract) {
+			sb.append("abstract");
+			sb.append(" ");
+		}
+		sb.append(name);
+		UMLParameter returnParameter = getReturnParameter();
+		List<UMLParameter> parameters = new ArrayList<UMLParameter>(this.parameters);
+		parameters.remove(returnParameter);
+		sb.append("(");
+		for(int i=0; i<parameters.size(); i++) {
+			UMLParameter parameter = parameters.get(i);
+			if(parameter.getKind().equals("in")) {
+				sb.append(parameter.toQualifiedString());
+				if(i < parameters.size()-1)
+					sb.append(", ");
+			}
+		}
+		sb.append(")");
+		if(returnParameter != null) {
+			sb.append(" : ");
+			sb.append(returnParameter.toQualifiedString());
 		}
 		return sb.toString();
 	}

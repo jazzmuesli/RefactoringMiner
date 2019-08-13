@@ -2,11 +2,9 @@ package gr.uom.java.xmi.diff;
 
 import gr.uom.java.xmi.UMLOperation;
 import gr.uom.java.xmi.UMLParameter;
-import gr.uom.java.xmi.decomposition.AbstractCodeFragment;
 import gr.uom.java.xmi.decomposition.AbstractCodeMapping;
 import gr.uom.java.xmi.decomposition.VariableDeclaration;
 import gr.uom.java.xmi.decomposition.VariableReferenceExtractor;
-import gr.uom.java.xmi.decomposition.VariableScope;
 
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
@@ -26,6 +24,7 @@ public class UMLOperationDiff {
 	private boolean visibilityChanged;
 	private boolean abstractionChanged;
 	private boolean returnTypeChanged;
+	private boolean qualifiedReturnTypeChanged;
 	private boolean operationRenamed;
 	private Set<AbstractCodeMapping> mappings = new LinkedHashSet<AbstractCodeMapping>();
 	
@@ -47,7 +46,17 @@ public class UMLOperationDiff {
 			abstractionChanged = true;
 		if(!removedOperation.equalReturnParameter(addedOperation))
 			returnTypeChanged = true;
+		else if(!removedOperation.equalQualifiedReturnParameter(addedOperation))
+			qualifiedReturnTypeChanged = true;
 		List<SimpleEntry<UMLParameter, UMLParameter>> matchedParameters = updateAddedRemovedParameters(removedOperation, addedOperation);
+		for(SimpleEntry<UMLParameter, UMLParameter> matchedParameter : matchedParameters) {
+			UMLParameter parameter1 = matchedParameter.getKey();
+			UMLParameter parameter2 = matchedParameter.getValue();
+			if(!parameter1.equalsQualified(parameter2)) {
+				UMLParameterDiff parameterDiff = new UMLParameterDiff(parameter1, parameter2);
+				parameterDiffList.add(parameterDiff);
+			}
+		}
 		int matchedParameterCount = matchedParameters.size()/2;
 		//first round match parameters with the same name
 		for(Iterator<UMLParameter> removedParameterIterator = removedParameters.iterator(); removedParameterIterator.hasNext();) {
@@ -192,7 +201,7 @@ public class UMLOperationDiff {
 		if(abstractionChanged)
 			sb.append("\t").append("abstraction changed from " + (removedOperation.isAbstract() ? "abstract" : "concrete") + " to " +
 					(addedOperation.isAbstract() ? "abstract" : "concrete")).append("\n");
-		if(returnTypeChanged)
+		if(returnTypeChanged || qualifiedReturnTypeChanged)
 			sb.append("\t").append("return type changed from " + removedOperation.getReturnParameter() + " to " + addedOperation.getReturnParameter()).append("\n");
 		for(UMLParameter umlParameter : removedParameters) {
 			sb.append("\t").append("parameter " + umlParameter + " removed").append("\n");
@@ -208,11 +217,13 @@ public class UMLOperationDiff {
 
 	public Set<Refactoring> getRefactorings() {
 		Set<Refactoring> refactorings = new LinkedHashSet<Refactoring>();
-		if(returnTypeChanged) {
+		if(returnTypeChanged || qualifiedReturnTypeChanged) {
 			UMLParameter removedOperationReturnParameter = removedOperation.getReturnParameter();
 			UMLParameter addedOperationReturnParameter = addedOperation.getReturnParameter();
 			if(removedOperationReturnParameter != null && addedOperationReturnParameter != null) {
-				ChangeReturnTypeRefactoring refactoring = new ChangeReturnTypeRefactoring(removedOperationReturnParameter.getType(), addedOperationReturnParameter.getType(), removedOperation, addedOperation);
+				Set<AbstractCodeMapping> references = VariableReferenceExtractor.findReturnReferences(mappings);
+				ChangeReturnTypeRefactoring refactoring = new ChangeReturnTypeRefactoring(removedOperationReturnParameter.getType(), addedOperationReturnParameter.getType(),
+						removedOperation, addedOperation, references);
 				refactorings.add(refactoring);
 			}
 		}
@@ -224,7 +235,7 @@ public class UMLOperationDiff {
 				RenameVariableRefactoring refactoring = new RenameVariableRefactoring(originalVariable, newVariable, removedOperation, addedOperation, references);
 				refactorings.add(refactoring);
 			}
-			if(parameterDiff.isTypeChanged()) {
+			if(parameterDiff.isTypeChanged() || parameterDiff.isQualifiedTypeChanged()) {
 				ChangeVariableTypeRefactoring refactoring = new ChangeVariableTypeRefactoring(originalVariable, newVariable, removedOperation, addedOperation, references);
 				refactorings.add(refactoring);
 			}

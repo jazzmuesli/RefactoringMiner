@@ -77,6 +77,19 @@ public class CompositeStatementObject extends AbstractStatement {
 		return innerNodes;
 	}
 
+	public boolean contains(AbstractCodeFragment fragment) {
+		if(fragment instanceof StatementObject) {
+			return getLeaves().contains(fragment);
+		}
+		else if(fragment instanceof CompositeStatementObject) {
+			return getInnerNodes().contains(fragment);
+		}
+		else if(fragment instanceof AbstractExpression) {
+			return getExpressions().contains(fragment);
+		}
+		return false;
+	}
+
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(locationInfo.getCodeElementType().getName());
@@ -409,6 +422,13 @@ public class CompositeStatementObject extends AbstractStatement {
 
 	public CodeRange codeRange() {
 		return locationInfo.codeRange();
+	}
+
+	public boolean isLoop() {
+		return this.locationInfo.getCodeElementType().equals(CodeElementType.ENHANCED_FOR_STATEMENT) ||
+				this.locationInfo.getCodeElementType().equals(CodeElementType.FOR_STATEMENT) ||
+				this.locationInfo.getCodeElementType().equals(CodeElementType.WHILE_STATEMENT) ||
+				this.locationInfo.getCodeElementType().equals(CodeElementType.DO_STATEMENT);
 	}
 
 	public CompositeStatementObject loopWithVariables(String currentElementName, String collectionName) {
