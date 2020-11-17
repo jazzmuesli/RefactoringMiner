@@ -2,13 +2,17 @@ package gr.uom.java.xmi.diff;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.refactoringminer.api.Refactoring;
 import org.refactoringminer.api.RefactoringMinerTimedOutException;
@@ -20,9 +24,12 @@ import gr.uom.java.xmi.UMLAttribute;
 import gr.uom.java.xmi.UMLClass;
 import gr.uom.java.xmi.UMLEnumConstant;
 import gr.uom.java.xmi.UMLOperation;
+import gr.uom.java.xmi.UMLParameter;
 import gr.uom.java.xmi.UMLType;
 import gr.uom.java.xmi.decomposition.AbstractCodeMapping;
+import gr.uom.java.xmi.decomposition.AbstractStatement;
 import gr.uom.java.xmi.decomposition.CompositeStatementObject;
+import gr.uom.java.xmi.decomposition.OperationBody;
 import gr.uom.java.xmi.decomposition.OperationInvocation;
 import gr.uom.java.xmi.decomposition.StatementObject;
 import gr.uom.java.xmi.decomposition.UMLOperationBodyMapper;
@@ -109,6 +116,98 @@ public abstract class UMLClassBaseDiff implements Comparable<UMLClassBaseDiff> {
 		checkForOperationSignatureChanges();
 		checkForInlinedOperations();
 		checkForExtractedOperations();
+		processConstructors();
+	}
+
+	protected void processConstructors() {
+		if (!attrToSet(originalClass).equals(attrToSet(nextClass))) {
+			return;
+		}
+		Map<String, UMLOperation> origMap = toMap(originalClass);
+		Map<String, UMLOperation> nextMap = toMap(nextClass);
+		final Pattern pat = Pattern.compile(".*this\\s*\\(.*");
+		origMap.entrySet().stream().filter(p->nextMap.containsKey(p.getKey())).forEach(k->{
+			UMLOperation constructor1 = origMap.get(k.getKey());
+			List<String> body1 = getBody(constructor1.getBody());
+			UMLOperation constructor2 = nextMap.get(k.getKey());
+			List<String> body2 = getBody(constructor2.getBody());
+			boolean foundOrig = body1.stream().filter(p->pat.matcher(p).find()).count() > 0;
+			boolean foundNext = body2.stream().filter(p->pat.matcher(p).find()).count() > 0;
+			List<UMLOperation> candidates = Collections.emptyList();
+			if (foundOrig) {
+				candidates = findCandidates(origMap, k);
+				System.out.println("orig matched: " + body1 + ", found candidates: " + candidates);
+			}
+			if (foundNext) {
+				candidates = findCandidates(nextMap, k);
+				System.out.println("next matched: " + body2 + ", found candidates: " + candidates);
+			}
+			// either in orig or next, but not in both.
+			if (foundOrig ^ foundNext) {
+				for (UMLOperation candidate:candidates) {
+					List<UMLParameter> parameters = candidate.getParameters();//cacandidates.stream().map(x->x.getParameters()).flatMap(List::stream).collect(Collectors.toList());
+					Refactoring e = new AddDefaultingConstructorRefactoring(parameters, constructor1, constructor2);
+					System.out.println("Added refactoring " + e);
+					refactorings.add(e);
+				}
+			}
+		});
+		System.out.println("origMap:"+origMap);
+		System.out.println("nextMap:"+nextMap);
+	}
+
+	protected Set<String> attrToSet(UMLClass uc) {
+		return uc.getAttributes().stream().map(x->x.getName()+":"+x.getType().getClassType()).collect(Collectors.toSet());
+	}
+
+	protected List<UMLOperation> findCandidates(Map<String, UMLOperation> nextMap, Entry<String, UMLOperation> k) {
+		return nextMap.entrySet().stream().filter(p->!k.getKey().equals(p.getKey())).map(x->x.getValue()).collect(Collectors.toList());
+	}
+
+	protected List<String> getBody(OperationBody body) {
+		List<AbstractStatement> statements = body.getCompositeStatement().getStatements();
+		return statements.stream().map(x->x.getString()).collect(Collectors.toList());
+	}
+
+	protected Map<String, UMLOperation> toMap(UMLClass comn) {
+		List<UMLOperation> cx = findConstructors(comn);
+		Map<String, UMLOperation> conMap = cx.stream().collect(Collectors.toMap(x->toString(x.getParameters()), x->x));
+		return conMap;
+	}
+
+	private String toString(List<UMLParameter> parameters) {
+		return parameters.stream().map(x->paramToString(x)).collect(Collectors.joining(","));
+	}
+
+	protected String paramToString(UMLParameter umlParameter) {
+		return umlParameter.getName()+":"+umlParameter.getType().getClassType();
+	}
+
+	protected void processX(UMLClass originalClass2) {
+		List<UMLOperation> originalConstructors = findConstructors(originalClass2);
+		originalConstructors.forEach(p->processConstructor(originalClass2, p));
+	}
+
+	protected List<UMLOperation> findConstructors(UMLClass originalClass2) {
+		List<UMLOperation> originalConstructors = originalClass2.getOperations().stream().filter(p->p.isConstructor()).collect(Collectors.toList());
+		return originalConstructors;
+	}
+
+	protected void processConstructor(UMLClass originalClass2, UMLOperation originalConstructor) {
+		System.out.println(originalClass2.getSourceFile());
+		Set<String> constructorParams = new HashSet(originalConstructor.getParameterNameList());
+		OperationBody body = originalConstructor.getBody();
+		List<List<String>> vars = body.getCompositeStatement().getStatements().
+		stream().filter(p->p.getString().contains("=")).map(v->v.getVariables()).collect(Collectors.toList());
+		Set<String> leftVars = getVarsAtPosition(vars, 0);
+		Set<String> rightVars = getVarsAtPosition(vars, 1);
+		System.out.println(leftVars + "," + rightVars);
+		System.out.println(originalClass2.getAttributes().get(0).getName());
+	}
+
+	protected Set<String> getVarsAtPosition(List<List<String>> vars, int pos) {
+		Set<String> leftVars = vars.stream().filter(p->p.size() > pos).map(x->x.get(pos)).collect(Collectors.toSet());
+		return leftVars;
 	}
 
 	private void processAnnotations() {
@@ -1712,7 +1811,7 @@ public abstract class UMLClassBaseDiff implements Comparable<UMLClassBaseDiff> {
 			addedEnumConstants.isEmpty() && removedEnumConstants.isEmpty() &&
 			operationDiffList.isEmpty() && attributeDiffList.isEmpty() &&
 			operationBodyMapperList.isEmpty() && enumConstantDiffList.isEmpty() &&
-			!visibilityChanged && !abstractionChanged;
+			!visibilityChanged && !abstractionChanged && refactorings.isEmpty();
 	}
 
 	public String toString() {

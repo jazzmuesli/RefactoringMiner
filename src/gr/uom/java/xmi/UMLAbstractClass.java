@@ -17,6 +17,7 @@ public abstract class UMLAbstractClass {
 	protected String name;
 	protected List<UMLOperation> operations;
 	protected List<UMLAttribute> attributes;
+	protected List<UMLAttribute> constructors;
 
 	public UMLAbstractClass() {
         this.operations = new ArrayList<UMLOperation>();

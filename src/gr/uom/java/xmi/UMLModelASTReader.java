@@ -95,7 +95,7 @@ public class UMLModelASTReader {
 		this(rootFolder, buildAstParser(rootFolder), javaFiles, getDirectories(rootFolder, javaFiles));
 	}
 
-	private static List<String> getJavaFilePaths(File folder) throws IOException {
+	public static List<String> getJavaFilePaths(File folder) throws IOException {
 		Stream<Path> walk = Files.walk(Paths.get(folder.toURI()));
 		List<String> paths = walk.map(x -> x.toString())
 				.filter(f -> f.endsWith(".java"))
