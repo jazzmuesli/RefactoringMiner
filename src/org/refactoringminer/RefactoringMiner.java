@@ -221,7 +221,7 @@ public class RefactoringMiner {
 		System.out.println(sb.toString());
 	}
 
-	private static void detectAtGitHubPullRequest(String[] args) throws Exception {
+	public static void detectAtGitHubPullRequest(String[] args) throws Exception {
 		if (args.length != 4) {
 			throw argumentException();
 		}

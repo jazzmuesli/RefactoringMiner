@@ -4,27 +4,9 @@ import gr.uom.java.xmi.UMLModel;
 import gr.uom.java.xmi.UMLModelASTReader;
 import gr.uom.java.xmi.diff.UMLModelDiff;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.StringWriter;
+import java.io.*;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -32,7 +14,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -55,6 +39,7 @@ import org.kohsuke.github.GHTree;
 import org.kohsuke.github.GHTreeEntry;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.PagedIterable;
+import org.kohsuke.github.*;
 import org.refactoringminer.api.Churn;
 import org.refactoringminer.api.GitHistoryRefactoringMiner;
 import org.refactoringminer.api.GitService;
@@ -70,12 +55,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMiner {
 
-	Logger logger = LoggerFactory.getLogger(GitHistoryRefactoringMinerImpl.class);
+	private final PRMiner prMiner;
+	private static final Logger logger = LoggerFactory.getLogger(GitHistoryRefactoringMinerImpl.class);
 	private Set<RefactoringType> refactoringTypesToConsider = null;
 	private GitHub gitHub;
-	
-	public GitHistoryRefactoringMinerImpl() {
+
+	public GitHistoryRefactoringMinerImpl(Function<GitHistoryRefactoringMinerImpl, PRMiner> prMinerProvider) {
 		this.setRefactoringTypesToConsider(RefactoringType.ALL);
+		this.prMiner = prMinerProvider.apply(this);
+	}
+
+	public GitHistoryRefactoringMinerImpl() {
+		this(CommitBasedPRMiner::new);
 	}
 
 	public void setRefactoringTypesToConsider(RefactoringType ... types) {
@@ -329,7 +320,7 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 		}
 	}
 
-	private GitHub connectToGitHub() {
+	protected GitHub connectToGitHub() {
 		if(gitHub == null) {
 			try {
 				Properties prop = new Properties();
@@ -548,7 +539,7 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 	protected List<Refactoring> detectRefactorings(final RefactoringHandler handler, String gitURL, String currentCommitId) {
 		List<Refactoring> refactoringsAtRevision = Collections.emptyList();
 		try {
-			Set<String> repositoryDirectoriesBefore = ConcurrentHashMap.newKeySet();
+			set<String> repositoryDirectoriesBefore = ConcurrentHashMap.newKeySet();
 			Set<String> repositoryDirectoriesCurrent = ConcurrentHashMap.newKeySet();
 			Map<String, String> fileContentsBefore = new ConcurrentHashMap<String, String>();
 			Map<String, String> fileContentsCurrent = new ConcurrentHashMap<String, String>();
@@ -574,7 +565,27 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 		return refactoringsAtRevision;
 	}
 
-	private void populateWithGitHubAPI(String cloneURL, String currentCommitId,
+	public void populateFromDiff(String content, Map<String, String> filesBefore, Map<String, String> filesCurrent) {
+		List<String> lines = new BufferedReader(new StringReader(content))
+				.lines()
+				.collect(Collectors.toList());
+		GitHub gitHub = connectToGitHub();
+	}
+
+	public String showContent(String cloneURL, Integer pullRequestId, String index) throws IOException {
+		GitHub gitHub = connectToGitHub();
+		String repoName = extractRepositoryName(cloneURL);
+		GHRepository repository = gitHub.getRepository(repoName);
+		GHPullRequest pullRequest = repository.getPullRequest(pullRequestId);
+		System.out.println("base:"+pullRequest.getBase().getSha());
+		System.out.println("head:"+pullRequest.getHead().getSha());
+		GHContent before = repository.getFileContent("ksql-engine/pom.xml", pullRequest.getBase().getSha());
+		GHContent after = repository.getFileContent("ksql-engine/pom.xml", pullRequest.getHead().getSha());
+
+		return after.getContent();
+	}
+
+	public void populateWithGitHubAPI(String cloneURL, String currentCommitId,
 			Map<String, String> filesBefore, Map<String, String> filesCurrent, Map<String, String> renamedFilesHint,
 			Set<String> repositoryDirectoriesBefore, Set<String> repositoryDirectoriesCurrent) throws IOException, InterruptedException {
 		logger.info("Processing {} {} ...", cloneURL, currentCommitId);
@@ -591,13 +602,11 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 					Runnable r = () -> {
 						try {
 							URL currentRawURL = commitFile.getRawUrl();
-							InputStream currentRawFileInputStream = currentRawURL.openStream();
-							String currentRawFile = IOUtils.toString(currentRawFileInputStream);
-							String rawURLInParentCommit = currentRawURL.toString().replace(currentCommitId, parentCommitId);
-							InputStream parentRawFileInputStream = new URL(rawURLInParentCommit).openStream();
-							String parentRawFile = IOUtils.toString(parentRawFileInputStream);
-							filesBefore.put(fileName, parentRawFile);
+							String currentRawFile = getContentByUrl(currentRawURL);
 							filesCurrent.put(fileName, currentRawFile);
+
+							String parentRawFile = getPreviousFileContent(currentCommitId, parentCommitId, currentRawURL);
+							filesBefore.put(fileName, parentRawFile);
 						}
 						catch(IOException e) {
 							e.printStackTrace();
@@ -609,8 +618,7 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 					Runnable r = () -> {
 						try {
 							URL currentRawURL = commitFile.getRawUrl();
-							InputStream currentRawFileInputStream = currentRawURL.openStream();
-							String currentRawFile = IOUtils.toString(currentRawFileInputStream);
+							String currentRawFile = getContentByUrl(currentRawURL);
 							filesCurrent.put(fileName, currentRawFile);
 						}
 						catch(IOException e) {
@@ -623,8 +631,7 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 					Runnable r = () -> {
 						try {
 							URL rawURL = commitFile.getRawUrl();
-							InputStream rawFileInputStream = rawURL.openStream();
-							String rawFile = IOUtils.toString(rawFileInputStream);
+							String rawFile = getContentByUrl(rawURL);
 							filesBefore.put(fileName, rawFile);
 							if(fileName.contains("/")) {
 								deletedAndRenamedFileParentDirectories.add(fileName.substring(0, fileName.lastIndexOf("/")));
@@ -641,11 +648,9 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 						try {
 							String previousFilename = commitFile.getPreviousFilename();
 							URL currentRawURL = commitFile.getRawUrl();
-							InputStream currentRawFileInputStream = currentRawURL.openStream();
-							String currentRawFile = IOUtils.toString(currentRawFileInputStream);
+							String currentRawFile = getContentByUrl(currentRawURL);
 							String rawURLInParentCommit = currentRawURL.toString().replace(currentCommitId, parentCommitId).replace(fileName, previousFilename);
-							InputStream parentRawFileInputStream = new URL(rawURLInParentCommit).openStream();
-							String parentRawFile = IOUtils.toString(parentRawFileInputStream);
+							String parentRawFile = getContentByUrl(new URL(rawURLInParentCommit));
 							filesBefore.put(previousFilename, parentRawFile);
 							filesCurrent.put(fileName, currentRawFile);
 							renamedFilesHint.put(previousFilename, fileName);
@@ -668,6 +673,17 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 		//allRepositoryDirectories(currentCommit.getTree(), "", repositoryDirectoriesCurrent);
 		//GHCommit parentCommit = repository.getCommit(parentCommitId);
 		//allRepositoryDirectories(parentCommit.getTree(), "", repositoryDirectoriesBefore);
+	}
+
+	protected String getContentByUrl(URL currentRawURL) throws IOException {
+		InputStream currentRawFileInputStream = currentRawURL.openStream();
+		return IOUtils.toString(currentRawFileInputStream);
+	}
+
+	private String getPreviousFileContent(String currentCommitId, String parentCommitId, URL currentRawURL) throws IOException {
+		String rawURLInParentCommit = currentRawURL.toString().replace(currentCommitId, parentCommitId);
+		URL url = new URL(rawURLInParentCommit);
+		return getContentByUrl(url);
 	}
 
 	private void repositoryDirectories(GHTree tree, String pathFromRoot, Set<String> repositoryDirectories, Set<String> targetPaths) throws IOException {
@@ -728,12 +744,7 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 
 	@Override
 	public void detectAtPullRequest(String cloneURL, int pullRequestId, RefactoringHandler handler, int timeout) throws IOException {
-		GHRepository repository = getGitHubRepository(cloneURL);
-		GHPullRequest pullRequest = repository.getPullRequest(pullRequestId);
-		PagedIterable<GHPullRequestCommitDetail> commits = pullRequest.listCommits();
-		for(GHPullRequestCommitDetail commit : commits) {
-			detectAtCommit(cloneURL, commit.getSha(), handler, timeout);
-		}
+		prMiner.detectAtPullRequest(cloneURL, pullRequestId, handler, timeout);
 	}
 
 	public GHRepository getGitHubRepository(String cloneURL) throws IOException {
@@ -745,7 +756,7 @@ public class GitHistoryRefactoringMinerImpl implements GitHistoryRefactoringMine
 	private static final String GITHUB_URL = "https://github.com/";
 	private static final String BITBUCKET_URL = "https://bitbucket.org/";
 
-	private static String extractRepositoryName(String cloneURL) {
+	static String extractRepositoryName(String cloneURL) {
 		int hostLength = 0;
 		if(cloneURL.startsWith(GITHUB_URL)) {
 			hostLength = GITHUB_URL.length();
